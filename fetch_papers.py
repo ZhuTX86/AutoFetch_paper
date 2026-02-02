@@ -83,7 +83,7 @@ def main():
     processed_list.sort(key=lambda x: x['date'], reverse=False)
 
     # 生成 Markdown 表格行
-    new_rows = [f"| {p['date']} | **{p['title']}** | {p['snippet']} | [查看详情]({p['link']}) |" for p in processed_list]
+    new_rows = [f"| {p['date']} | **{p['title']}** | {p['snippet']} | [Paper]({p['link']}) |" for p in processed_list]
 
     # 写入逻辑
     if not os.path.exists(FILE_NAME):
@@ -96,10 +96,11 @@ def main():
         with open(FILE_NAME, "a", encoding="utf-8") as f:
             f.write("\n" + "\n".join(new_rows))
     
-    print(f"✅ 更新 {len(new_rows)} 篇文献")
+    print(f"更新 {len(new_rows)} 篇文献")
 
 if __name__ == "__main__":
     main()
+
 
 
 
