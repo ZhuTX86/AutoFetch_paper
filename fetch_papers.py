@@ -8,7 +8,7 @@ from serpapi import GoogleSearch
 # 建议通过环境变量设置，或在此直接修改
 
 SEARCH_QUERY = 'optimization (Muon OR Gluon OR Shampoo OR "linear minimization oracle" OR LMO)' 
-YEAR_LOW = datetime.now().year - 1  # 默认搜索去年到今年
+YEAR_LOW = datetime.now().year - 2  # 默认搜索去年到今年
 YEAR_HIGH = datetime.now().year
 FILE_NAME = "papers.md"
 # ===========================================
@@ -119,3 +119,4 @@ if __name__ == "__main__":
 
 
     
+
