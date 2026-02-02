@@ -1,41 +1,48 @@
 import os
 import re
 import sys
+import time
 from datetime import datetime
 from serpapi import GoogleSearch
+from googletrans import Translator
 
 # ================= 配置区域 =================
-# 建议通过环境变量设置，或在此直接修改
-
-SEARCH_QUERY = 'optimization (Muon OR Gluon OR Shampoo OR "linear minimization oracle" OR LMO)' 
-YEAR_LOW = datetime.now().year - 2  # 默认搜索去年到今年
+SEARCH_QUERY = 'optimization (Muon OR Gluon OR Shampoo OR "linear minimization oracle" OR LMO)'
+YEAR_LOW = datetime.now().year - 1
 YEAR_HIGH = datetime.now().year
 FILE_NAME = "papers.md"
 # ===========================================
 
 def clean_text(text):
-    """清理字符串中的换行符和特殊Markdown字符，防止破坏表格结构"""
-    if not text:
-        return "N/A"
+    if not text: return "N/A"
     return text.replace("\n", " ").replace("|", "｜").strip()
 
-def is_valid_result(item):
-    """基础过滤逻辑：剔除无链接、纯引用、图书"""
-    title = item.get("title", "").upper()
-    link = item.get("link")
-    
-    # 过滤掉没有链接的结果
-    if not link:
-        return False
-    # 过滤掉 Google Scholar 标记为 [CITATION] 或 [B] (Book) 的项
-    if "[CITATION]" in title or "[B]" in title:
-        return False
-    return True
+def translate_to_zh(text):
+    """将英文摘要翻译为中文"""
+    if not text or text == "N/A":
+        return "暂无摘要"
+    try:
+        # 实例化翻译器
+        translator = Translator()
+        # 尝试翻译
+        result = translator.translate(text, dest='zh-cn')
+        return result.text
+    except Exception as e:
+        print(f"翻译记录时出现小插曲: {e}")
+        return "（翻译暂时不可用）"
+
+def load_existing_links(file_path):
+    """读取旧文件，提取已存在的论文链接防止重复"""
+    if not os.path.exists(file_path):
+        return set()
+    with open(file_path, "r", encoding="utf-8") as f:
+        content = f.read()
+        return set(re.findall(r'\[查看详情\]\((https?://[^\s)]+)\)', content))
 
 def fetch_scholar_data():
     api_key = os.getenv("SERPAPI_KEY")
     if not api_key:
-        print("错误: 未找到环境变量 SERPAPI_KEY")
+        print("错误: 环境变量 SERPAPI_KEY 未设置")
         sys.exit(1)
 
     params = {
@@ -43,80 +50,92 @@ def fetch_scholar_data():
         "q": SEARCH_QUERY,
         "as_ylo": YEAR_LOW,
         "as_yhi": YEAR_HIGH,
+        "num": "20",  # 每次抓取前20条
         "hl": "zh-CN",
         "api_key": api_key
     }
 
     try:
         search = GoogleSearch(params)
-        results = search.get_dict()
-        return results.get("organic_results", [])
+        return search.get_dict().get("organic_results", [])
     except Exception as e:
-        print(f"API 请求失败: {e}")
+        print(f"SerpApi 请求失败: {e}")
         return []
 
-def process_to_markdown(papers):
-    """核心处理逻辑：去重、过滤、排序、格式化"""
-    seen_titles = set()
-    final_list = []
-
-    for item in papers:
-        if not is_valid_result(item):
-            continue
-            
-        # 简单去重逻辑：基于标题字符
-        title = item.get("title")
-        title_slug = re.sub(r'\W+', '', title).lower()
-        if title_slug in seen_titles:
-            continue
-        seen_titles.add(title_slug)
-
-        # 提取信息
-        pub_info = item.get("publication_info", {}).get("summary", "N/A")
-        snippet = clean_text(item.get("snippet", ""))
-        link = item.get("link")
-
-        final_list.append({
-            "year": pub_info,
-            "title": clean_text(title),
-            "snippet": snippet,
-            "link": link
-        })
-
-    # 生成 Markdown 内容
-    header = f"# 自动化文献追踪报告\n\n"
-    header += f"> **搜索词**: `{SEARCH_QUERY}` | **时间范围**: {YEAR_LOW}-{YEAR_HIGH} | **更新时间**: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n"
-    
-    table_header = "| 发表时间/来源 | 论文题目 | 摘要摘要 | 链接 |\n| :--- | :--- | :--- | :--- |\n"
-    
-    rows = []
-    for p in final_list:
-        row = f"| {p['year']} | **{p['title']}** | {p['snippet']} | [查看详情]({p['link']}) |"
-        rows.append(row)
-
-    if not rows:
-        return header + " 本次运行未检索到符合条件的文献。"
-    
-    return header + table_header + "\n".join(rows)
-
 def main():
-    print(f"开始检索: {SEARCH_QUERY}...")
+    print(f"🚀 启动自动化追踪任务: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    
+    existing_links = load_existing_links(FILE_NAME)
     raw_papers = fetch_scholar_data()
     
     if not raw_papers:
-        print("未发现新结果。")
+        print("💡 未检索到新内容。")
         return
 
-    md_output = process_to_markdown(raw_papers)
-    
+    new_rows = []
+    for item in raw_papers:
+        link = item.get("link")
+        title = item.get("title", "Untitled")
+        
+        # 基础过滤
+        if not link or "[CITATION]" in title.upper() or "[B]" in title.upper():
+            continue
+        # 增量去重
+        if link in existing_links:
+            continue
+            
+        print(f"📝 正在处理新文献: {title[:50]}...")
+        
+        # 获取并翻译摘要
+        snippet_en = item.get("snippet", "")
+        snippet_zh = translate_to_zh(snippet_en)
+        
+        # 格式化数据（支持 Markdown 换行排版）
+        clean_title = clean_text(title)
+        year_info = item.get("publication_info", {}).get("summary", "N/A")
+        
+        # 排版优化：中文在前，英文在后并缩小
+        combined_snippet = f"{clean_text(snippet_zh)}<br><small>原文: {clean_text(snippet_en)}</small>"
+        
+        row = f"| {year_info} | **{clean_title}** | {combined_snippet} | [查看详情]({link}) |"
+        new_rows.append(row)
+        
+        # 稍微暂停防止翻译接口请求过快
+        time.sleep(0.5)
+
+    if not new_rows:
+        print("💡 检索到的文献库中均已存在。")
+        return
+
+    # 构建文件内容
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
+    table_header = "| 发表时间/来源 | 论文题目 | 摘要 (中/英) | 链接 |\n| :--- | :--- | :--- | :--- |\n"
+    title_section = f"# 🎓 自动文献追踪报告\n\n> 最后更新: `{timestamp}` | 搜索词: `{SEARCH_QUERY}`\n\n"
+
+    if not os.path.exists(FILE_NAME):
+        final_content = title_section + table_header + "\n".join(new_rows)
+    else:
+        with open(FILE_NAME, "r", encoding="utf-8") as f:
+            old_lines = f.readlines()
+        
+        # 定位表格内容开始的行
+        header_index = 0
+        for i, line in enumerate(old_lines):
+            if "| :--- |" in line:
+                header_index = i + 1
+                break
+        
+        old_rows_part = "".join(old_lines[header_index:]) if header_index > 0 else ""
+        final_content = title_section + table_header + "\n".join(new_rows) + "\n" + old_rows_part
+
     with open(FILE_NAME, "w", encoding="utf-8") as f:
-        f.write(md_output)
+        f.write(final_content)
     
-    print(f" 成功! 文献已整理至 {FILE_NAME}，共 {len(raw_papers)} 项。")
+    print(f"✨ 任务完成! 本次新增 {len(new_rows)} 篇文献。")
 
 if __name__ == "__main__":
     main()
 
-
     
+
 
