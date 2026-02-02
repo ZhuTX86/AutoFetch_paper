@@ -2,12 +2,14 @@ name: Auto Scholar Update
 
 on:
   schedule:
-    - cron: '0 0 * * 1'  # 每周一北京时间上午8点运行 (UTC 0)
-  workflow_dispatch:      # 允许你在 GitHub 页面上点击按钮手动触发
+    - cron: '0 0 * * 1' # 每周一北京时间上午8点运行
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # 必须赋予写入权限
     
     steps:
       - name: Checkout code
@@ -21,17 +23,17 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install google-search-results  # <--- 就是这一步解决了你的担忧
+          pip install google-search-results googletrans==4.0.0-rc1
 
       - name: Run fetch script
         env:
-          SERPAPI_KEY: ${{ secrets.SERPAPI_KEY }} # 读取你刚才设置的 Secret
+          SERPAPI_KEY: ${{ secrets.SERPAPI_KEY }}
         run: python fetch_papers.py
 
       - name: Commit and Push changes
         run: |
-          git config --global user.email "actions@github.com"
-          git config --global user.name "GitHub Action"
+          git config --global user.email "bot@github.com"
+          git config --global user.name "ScholarBot"
           git add papers.md
-          git commit -m "Auto-update papers: $(date +'%Y-%m-%d')" || exit 0
+          git commit -m "Auto-update: $(date +'%Y-%m-%d')" || exit 0
           git push
