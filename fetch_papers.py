@@ -6,7 +6,7 @@ from serpapi import GoogleSearch
 
 # ================= 配置区域 =================
 SEARCH_QUERY = 'optimization (Muon OR Gluon OR Shampoo OR "linear minimization oracle" OR LMO)'
-YEAR_LOW = datetime.now().year - 2
+YEAR_LOW = datetime.now().year - 1 
 YEAR_HIGH = datetime.now().year
 FILE_NAME = "papers.md"
 # ===========================================
@@ -16,19 +16,17 @@ def clean_text(text):
     return text.replace("\n", " ").replace("|", "｜").strip()
 
 def load_existing_links(file_path):
-    """从已有的 md 文件中提取所有链接，防止重复记录"""
-    if not os.path.exists(file_path):
+    """从已有的 md 文件中提取所有链接，防止重复"""
+    if not os.path.exists(file_path): 
         return set()
     with open(file_path, "r", encoding="utf-8") as f:
         content = f.read()
-        # 匹配 Markdown 格式中的链接 [查看详情](URL)
         return set(re.findall(r'\[查看详情\]\((https?://[^\s)]+)\)', content))
 
 def fetch_scholar_data():
-    """获取数据，默认获取前20条结果"""
     api_key = os.getenv("SERPAPI_KEY")
     if not api_key:
-        print("错误: 未找到环境变量 SERPAPI_KEY")
+        print("错误: 未找到 SERPAPI_KEY")
         sys.exit(1)
 
     params = {
@@ -36,90 +34,72 @@ def fetch_scholar_data():
         "q": SEARCH_QUERY,
         "as_ylo": YEAR_LOW,
         "as_yhi": YEAR_HIGH,
-        "num": "20",  # 扩大单次检索量
+        "num": "20",
         "hl": "zh-CN",
         "api_key": api_key
     }
-
     try:
         search = GoogleSearch(params)
-        results = search.get_dict()
-        return results.get("organic_results", [])
+        return search.get_dict().get("organic_results", [])
     except Exception as e:
-        print(f"API 请求失败: {e}")
+        print(f"请求失败: {e}")
         return []
 
 def main():
-    print(f"🚀 开始增量检索: {SEARCH_QUERY}...")
-    
-    # 1. 加载旧数据，防止重复
+    print(f"启动任务: {datetime.now().strftime('%Y-%m-%d')}")
     existing_links = load_existing_links(FILE_NAME)
-    print(f"📁 库中已存在文献: {len(existing_links)} 篇")
-
-    # 2. 抓取新数据
     raw_papers = fetch_scholar_data()
+    
     if not raw_papers:
-        print("💡 未发现任何结果。")
+        print("未发现新结果。")
         return
 
-    # 3. 过滤出真正的新文献
-    new_rows = []
+    processed_list = []
     for item in raw_papers:
         link = item.get("link")
         title = item.get("title", "Untitled")
         
-        # 过滤逻辑：无链接、纯引用、图书、已存在
-        if not link or "[CITATION]" in title.upper() or "[B]" in title.upper():
-            continue
-        if link in existing_links:
+        # 过滤广告和重复
+        if not link or "[CITATION]" in title.upper() or link in existing_links:
             continue
             
-        # 格式化数据
-        clean_title = clean_text(title)
-        year = item.get("publication_info", {}).get("summary", "N/A")
-        snippet = clean_text(item.get("snippet", ""))
-        
-        row = f"| {year} | **{clean_title}** | {snippet} | [查看详情]({link}) |"
-        new_rows.append(row)
+        # 提取日期
+        pub_info = item.get("publication_info", {}).get("summary", "")
+        date_match = re.search(r'(\d{4}[年/-]\d{1,2}[月/-]\d{1,2})', pub_info)
+        date_str = date_match.group(1) if date_match else f"{YEAR_HIGH}-01-01"
 
-    if not new_rows:
-        print("💡 检索到的文献已全部存在，无需更新。")
+        processed_list.append({
+            "date": date_str,
+            "title": clean_text(title),
+            "snippet": clean_text(item.get("snippet", "No snippet available")),
+            "link": link
+        })
+
+    if not processed_list:
+        print("检索到的文献已在记录中。")
         return
 
-    # 4. 组装最终内容（置顶新文献）
-    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
-    table_header = "| 发表时间/来源 | 论文题目 | 摘要摘要 | 链接 |\n| :--- | :--- | :--- | :--- |\n"
-    title_section = f"# 🎓 自动文献追踪报告\n\n> **最后更新**: `{timestamp}` | **搜索词**: `{SEARCH_QUERY}`\n\n"
+    # 排序：由远到近（时间升序）
+    processed_list.sort(key=lambda x: x['date'], reverse=False)
 
+    # 生成 Markdown 表格行
+    new_rows = [f"| {p['date']} | **{p['title']}** | {p['snippet']} | [查看详情]({p['link']}) |" for p in processed_list]
+
+    # 写入逻辑
     if not os.path.exists(FILE_NAME):
-        # 第一次创建文件
-        final_content = title_section + table_header + "\n".join(new_rows)
+        header = f"# 文献追踪历史\n\n> 搜索词: `{SEARCH_QUERY}`\n\n| 日期 | 标题 | 摘要片段 | 链接 |\n| :--- | :--- | :--- | :--- |\n"
+        content = header + "\n".join(new_rows)
+        with open(FILE_NAME, "w", encoding="utf-8") as f:
+            f.write(content)
     else:
-        # 读取旧文件内容，保留表头，插入新行
-        with open(FILE_NAME, "r", encoding="utf-8") as f:
-            old_lines = f.readlines()
-        
-        # 寻找表格开始的位置（即 | :--- | 之后的一行）
-        header_index = 0
-        for i, line in enumerate(old_lines):
-            if "| :--- |" in line:
-                header_index = i + 1
-                break
-        
-        # 重新拼接：新的标题 + 表头 + 新行 + 旧行
-        header_part = title_section + table_header
-        old_rows_part = "".join(old_lines[header_index:]) if header_index > 0 else ""
-        final_content = header_part + "\n".join(new_rows) + "\n" + old_rows_part
-
-    # 5. 写入文件
-    with open(FILE_NAME, "w", encoding="utf-8") as f:
-        f.write(final_content)
+        # 追加到文件末尾
+        with open(FILE_NAME, "a", encoding="utf-8") as f:
+            f.write("\n" + "\n".join(new_rows))
     
-    print(f"✅ 成功! 本次新增 {len(new_rows)} 篇文献。")
+    print(f"✅ 更新 {len(new_rows)} 篇文献")
 
 if __name__ == "__main__":
     main()
-    
 
 
 
