@@ -6,7 +6,7 @@ from serpapi import GoogleSearch
 
 # ================= 配置区域 =================
 SEARCH_QUERY = 'optimization (Muon OR Gluon OR Shampoo OR "linear minimization oracle" OR LMO)'
-YEAR_LOW = datetime.now().year - 1 
+YEAR_LOW = datetime.now().year - 2 
 YEAR_HIGH = datetime.now().year
 FILE_NAME = "papers.md"
 # ===========================================
@@ -34,7 +34,7 @@ def fetch_scholar_data():
         "q": SEARCH_QUERY,
         "as_ylo": YEAR_LOW,
         "as_yhi": YEAR_HIGH,
-        "num": "20",
+        "num": "30",
         "hl": "zh-CN",
         "api_key": api_key
     }
@@ -100,6 +100,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
