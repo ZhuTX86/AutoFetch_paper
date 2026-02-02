@@ -5,7 +5,7 @@ from datetime import datetime
 from serpapi import GoogleSearch
 
 # ================= 配置区域 =================
-SEARCH_QUERY = 'optimization convergence (Muon OR Gluon OR Shampoo OR "linear minimization oracle" OR LMO)'
+SEARCH_QUERY = 'optimization (Muon OR Gluon OR Shampoo OR "linear minimization oracle" OR LMO)'
 YEAR_LOW = datetime.now().year - 2
 YEAR_HIGH = datetime.now().year
 FILE_NAME = "papers.md"
@@ -120,6 +120,7 @@ def main():
 if __name__ == "__main__":
     main()
     
+
 
 
 
