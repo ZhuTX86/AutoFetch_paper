@@ -50,7 +50,7 @@ def fetch_scholar_data():
         "q": SEARCH_QUERY,
         "as_ylo": YEAR_LOW,
         "as_yhi": YEAR_HIGH,
-        "num": "20",  # 每次抓取前20条
+        "num": "5",  # 每次抓取前20条
         "hl": "zh-CN",
         "api_key": api_key
     }
@@ -137,5 +137,6 @@ if __name__ == "__main__":
     main()
 
     
+
 
 
