@@ -8,7 +8,7 @@ from googletrans import Translator
 
 # ================= 配置区域 =================
 SEARCH_QUERY = 'optimization (Muon OR Gluon OR Shampoo OR "linear minimization oracle" OR LMO)'
-YEAR_LOW = datetime.now().year - 1
+YEAR_LOW = datetime.now().year - 2
 YEAR_HIGH = datetime.now().year
 FILE_NAME = "papers.md"
 # ===========================================
@@ -137,6 +137,7 @@ if __name__ == "__main__":
     main()
 
     
+
 
 
 
