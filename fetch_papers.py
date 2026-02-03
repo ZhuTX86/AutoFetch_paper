@@ -65,11 +65,11 @@ def main():
             
         # 提取日期
         pub_info = item.get("publication_info", {}).get("summary", "")
-        date_match = re.search(r'(\d{4}[年/-]\d{1,2}[月/-]\d{1,2})', pub_info)
-        date_str = date_match.group(1) if date_match else f"{YEAR_HIGH}-01-01"
+        # date_match = re.search(r'(\d{4}[年/-]\d{1,2}[月/-]\d{1,2})', pub_info)
+        # date_str = date_match.group(1) if date_match else f"{YEAR_HIGH}-01-01"
 
         processed_list.append({
-            "date": date_str,
+            "date": pub_info,
             "title": clean_text(title),
             "snippet": clean_text(item.get("snippet", "No snippet available")),
             "link": link
@@ -100,6 +100,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
